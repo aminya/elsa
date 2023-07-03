@@ -23,6 +23,7 @@ use std::sync::RwLock;
 
 /// Append-only threadsafe version of `std::collections::HashMap` where
 /// insertion does not require mutable access
+#[derive(Debug)]
 pub struct FrozenMap<K, V> {
     map: RwLock<HashMap<K, V>>,
 }
@@ -383,6 +384,7 @@ impl<K, V> std::convert::AsMut<HashMap<K, V>> for FrozenMap<K, V> {
 
 /// Append-only threadsafe version of `std::vec::Vec` where
 /// insertion does not require mutable access
+#[derive(Debug)]
 pub struct FrozenVec<T> {
     vec: RwLock<Vec<T>>,
 }
@@ -539,6 +541,7 @@ const NUM_BUFFERS: usize = (usize::BITS >> 2) as usize;
 /// Note that this data structure is `64` pointers large on
 /// 64 bit systems,
 /// in contrast to `Vec` which is `3` pointers large.
+#[derive(Debug)]
 pub struct LockFreeFrozenVec<T: Copy> {
     data: [AtomicPtr<T>; NUM_BUFFERS],
     len: AtomicUsize,
