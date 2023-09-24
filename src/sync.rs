@@ -391,6 +391,14 @@ impl<K: Eq + Hash, V: PartialEq> PartialEq for FrozenMap<K, V> {
     }
 }
 
+impl<K: Clone, V: Clone> Clone for FrozenMap<K, V> {
+    fn clone(&self) -> Self {
+        Self {
+            map: self.map.read().unwrap().clone().into(),
+        }
+    }
+}
+
 /// Append-only threadsafe version of `std::vec::Vec` where
 /// insertion does not require mutable access
 #[derive(Debug)]
@@ -504,6 +512,14 @@ impl<T: PartialEq> PartialEq for FrozenVec<T> {
         let self_ref: &Vec<T> = &self.vec.read().unwrap();
         let other_ref: &Vec<T> = &other.vec.read().unwrap();
         self_ref == other_ref
+    }
+}
+
+impl<T: Clone> Clone for FrozenVec<T> {
+    fn clone(&self) -> Self {
+        Self {
+            vec: self.vec.read().unwrap().clone().into(),
+        }
     }
 }
 
@@ -753,6 +769,47 @@ fn test_non_lockfree_unchecked() {
     LockFreeFrozenVec::<()>::new();
 }
 
+impl<T: Copy + Clone> Clone for LockFreeFrozenVec<T> {
+    fn clone(&self) -> Self {
+        let len = self.len.load(Ordering::Acquire);
+        // handle the empty case
+        if len == 0 {
+            return Self::default();
+        }
+
+        // copy the data
+        let data = [Self::NULL; NUM_BUFFERS];
+        // for each buffer, copy the data
+        for i in 0..NUM_BUFFERS {
+            // get the buffer size and index
+            let buffer_size = buffer_size(i);
+            let buffer_idx = buffer_index(buffer_size - 1);
+            // get the buffer pointer
+            let buffer_ptr = self.data[buffer_idx].load(Ordering::Acquire);
+            if buffer_ptr.is_null() {
+                // no data in this buffer
+                break;
+            }
+            // allocate a new buffer
+            let layout = Self::layout(buffer_size);
+            let new_buffer_ptr = unsafe { std::alloc::alloc(layout).cast::<T>() };
+            assert!(!new_buffer_ptr.is_null());
+            // copy the data
+            unsafe {
+                std::ptr::copy_nonoverlapping(buffer_ptr, new_buffer_ptr, buffer_size);
+            }
+            // store the new buffer pointer
+            data[i].store(new_buffer_ptr, Ordering::Release);
+        }
+
+        return Self {
+            data,
+            len: AtomicUsize::new(len),
+            locked: AtomicBool::new(false),
+        };
+    }
+}
+
 #[test]
 fn test_non_lockfree() {
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -783,6 +840,12 @@ fn test_non_lockfree() {
             while vec.get(i).is_none() {}
         }
     });
+
+    // Test cloning
+    let vec2 = vec.clone();
+    assert_eq!(vec2.get(0), Some(Moo(1)));
+    assert_eq!(vec2.get(1), Some(Moo(2)));
+    assert_eq!(vec2.get(2), Some(Moo(3)));
 
     // Test dropping empty vecs
     LockFreeFrozenVec::<()>::new();
@@ -979,5 +1042,11 @@ impl<K: PartialEq, V: PartialEq> PartialEq for FrozenBTreeMap<K, V> {
         let self_ref: &BTreeMap<K, V> = &self.0.read().unwrap();
         let other_ref: &BTreeMap<K, V> = &other.0.read().unwrap();
         self_ref == other_ref
+    }
+}
+
+impl<K: Clone, V: Clone> Clone for FrozenBTreeMap<K, V> {
+    fn clone(&self) -> Self {
+        Self(self.0.read().unwrap().clone().into())
     }
 }

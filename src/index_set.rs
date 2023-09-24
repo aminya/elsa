@@ -194,3 +194,16 @@ impl<T: Hash + Eq, S: BuildHasher> PartialEq for FrozenIndexSet<T, S> {
         ret
     }
 }
+
+impl<K: Clone, V: Clone> Clone for FrozenIndexSet<K, V> {
+    fn clone(&self) -> Self {
+        assert!(!self.in_use.get());
+        self.in_use.set(true);
+        let self_clone = Self {
+            set: unsafe { self.set.get().as_ref().unwrap() }.clone().into(),
+            in_use: Cell::from(false),
+        };
+        self.in_use.set(false);
+        return self_clone;
+    }
+}
