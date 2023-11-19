@@ -712,6 +712,7 @@ const NUM_BUFFERS: usize = (usize::BITS >> 2) as usize;
 /// Note that this data structure is `64` pointers large on
 /// 64 bit systems,
 /// in contrast to `Vec` which is `3` pointers large.
+#[derive(Debug)]
 pub struct LockFreeFrozenVec<T: Copy> {
     data: [AtomicPtr<T>; NUM_BUFFERS],
     len: AtomicUsize,

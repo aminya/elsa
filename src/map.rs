@@ -14,6 +14,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// Append-only version of `std::collections::HashMap` where
 /// insertion does not require mutable access
+#[derive(Debug)]
 pub struct FrozenMap<K, V, S = RandomState> {
     map: UnsafeCell<HashMap<K, V, S>>,
     /// Eq/Hash implementations can have side-effects, and using Rc it is possible
@@ -335,6 +336,7 @@ where
 
 /// Append-only version of `std::collections::BTreeMap` where
 /// insertion does not require mutable access
+#[derive(Debug)]
 pub struct FrozenBTreeMap<K, V> {
     map: UnsafeCell<BTreeMap<K, V>>,
     /// Eq/Hash implementations can have side-effects, and using Rc it is possible

@@ -13,6 +13,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// Append-only version of `indexmap::IndexMap` where
 /// insertion does not require mutable access
+#[derive(Debug)]
 pub struct FrozenIndexMap<K, V, S = RandomState> {
     map: UnsafeCell<IndexMap<K, V, S>>,
     /// Eq/Hash implementations can have side-effects, and using Rc it is possible
