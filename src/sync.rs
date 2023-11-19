@@ -10,9 +10,12 @@ use stable_deref_trait::StableDeref;
 use std::alloc::Layout;
 use std::borrow::Borrow;
 use std::cmp::Eq;
+use std::collections::hash_map::RandomState;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
+use std::default::Default;
 use std::fmt;
+use std::hash::BuildHasher;
 use std::hash::Hash;
 use std::iter::{FromIterator, IntoIterator};
 use std::ops::Index;
@@ -35,11 +38,11 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
     derive(Serialize, Deserialize),
     serde(bound(deserialize = "K: Eq + Hash + Deserialize<'de>, V: Deserialize<'de>"))
 )]
-pub struct FrozenMap<K, V> {
-    map: RwLock<HashMap<K, V>>,
+pub struct FrozenMap<K, V, S = RandomState> {
+    map: RwLock<HashMap<K, V, S>>,
 }
 
-impl<K: fmt::Debug, V: fmt::Debug> fmt::Debug for FrozenMap<K, V> {
+impl<K: fmt::Debug, V: fmt::Debug, S: BuildHasher> fmt::Debug for FrozenMap<K, V, S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.map.try_read() {
             Ok(guard) => guard.fmt(f),
@@ -61,7 +64,7 @@ impl<K: fmt::Debug, V: fmt::Debug> fmt::Debug for FrozenMap<K, V> {
     }
 }
 
-impl<K, V> Default for FrozenMap<K, V> {
+impl<K, V, S: Default> Default for FrozenMap<K, V, S> {
     fn default() -> Self {
         Self {
             map: Default::default(),
@@ -83,7 +86,7 @@ impl<T> From<Vec<T>> for FrozenVec<T> {
     }
 }
 
-impl<K: Eq + Hash, V: StableDeref> FrozenMap<K, V> {
+impl<K: Eq + Hash, V: StableDeref, S: BuildHasher> FrozenMap<K, V, S> {
     // these should never return &K or &V
     // these should never delete any entries
 
@@ -234,7 +237,7 @@ impl<K: Eq + Hash, V: StableDeref> FrozenMap<K, V> {
     }
 }
 
-impl<K, V> FrozenMap<K, V> {
+impl<K, V, S> FrozenMap<K, V, S> {
     /// Collects the contents of this map into a vector of tuples.
     ///
     /// The order of the entries is as if iterating a [`HashMap`] (stochastic).
@@ -293,13 +296,13 @@ impl<K, V> FrozenMap<K, V> {
     // TODO add more
 }
 
-impl<K: Clone, V> FrozenMap<K, V> {
+impl<K: Clone, V, S> FrozenMap<K, V, S> {
     pub fn keys_cloned(&self) -> Vec<K> {
         self.map.read().unwrap().keys().cloned().collect()
     }
 }
 
-impl<K: Eq + Hash, V: Copy> FrozenMap<K, V> {
+impl<K: Eq + Hash, V: Copy, S: BuildHasher> FrozenMap<K, V, S> {
     /// Returns a copy of the value corresponding to the key.
     ///
     /// The key may be any borrowed form of the map's key type, but
@@ -413,17 +416,17 @@ impl<K: Eq + Hash, V: Copy> FrozenMap<K, V> {
     }
 }
 
-impl<K, V> std::convert::AsMut<HashMap<K, V>> for FrozenMap<K, V> {
+impl<K, V, S> std::convert::AsMut<HashMap<K, V, S>> for FrozenMap<K, V, S> {
     /// Get mutable access to the underlying [`HashMap`].
     ///
     /// This is safe, as it requires a `&mut self`, ensuring nothing is using
     /// the 'frozen' contents.
-    fn as_mut(&mut self) -> &mut HashMap<K, V> {
+    fn as_mut(&mut self) -> &mut HashMap<K, V, S> {
         self.map.get_mut().unwrap()
     }
 }
 
-impl<K: Clone, V: Clone> Clone for FrozenMap<K, V> {
+impl<K: Clone, V: Clone, S: Clone> Clone for FrozenMap<K, V, S> {
     fn clone(&self) -> Self {
         Self {
             map: self.map.read().unwrap().clone().into(),
@@ -431,10 +434,10 @@ impl<K: Clone, V: Clone> Clone for FrozenMap<K, V> {
     }
 }
 
-impl<K: Eq + Hash, V: PartialEq> PartialEq for FrozenMap<K, V> {
+impl<K: Eq + Hash, V: PartialEq, S: BuildHasher> PartialEq for FrozenMap<K, V, S> {
     fn eq(&self, other: &Self) -> bool {
-        let self_ref: &HashMap<K, V> = &self.map.read().unwrap();
-        let other_ref: &HashMap<K, V> = &other.map.read().unwrap();
+        let self_ref: &HashMap<K, V, S> = &self.map.read().unwrap();
+        let other_ref: &HashMap<K, V, S> = &other.map.read().unwrap();
         self_ref == other_ref
     }
 }
